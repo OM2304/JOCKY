@@ -1,0 +1,84 @@
+// triage.jck — read-only incident-report triage.
+// Identity, process census + anomalies, persistence sweep, network census,
+// ARP neighbours, DNS cache. Nothing is written; nothing is spawned.
+
+func main() {
+    log("=== JOCKY HOST TRIAGE ===");
+    let info = sysinfo();
+    log("host  :", hostname());
+    log("time  :", now());
+    log("os    :", get(info, "os"), get(info, "release"),
+        get(info, "machine"), "| py", get(info, "python"));
+    log("cwd   :", cwd());
+
+    // -- process census + anomalies -----------------------------------
+    let tree = proctree();
+    let anomalies = 0;
+    for (n in tree) {
+        if (get(n, "anomaly", false)) {
+            anomalies = anomalies + 1;
+        }
+    }
+    log("");
+    log("[procs] census:", len(tree), " flagged:", anomalies);
+    let shown = 0;
+    for (n in tree) {
+        if (get(n, "anomaly", false)) {
+            if (shown < 5) {
+                log("  ! pid", get(n, "pid"), "(", get(n, "name"), ") -",
+                    get(n, "note"));
+                shown = shown + 1;
+            }
+        }
+    }
+
+    // -- persistence sweep --------------------------------------------
+    let pers = persistence();
+    let hot = 0;
+    for (e in pers) {
+        if (get(e, "score", 0) >= 2) {
+            hot = hot + 1;
+        }
+    }
+    log("");
+    log("[persistence] entries:", len(pers), " scored>=2:", hot);
+    let shown2 = 0;
+    for (e in pers) {
+        if (get(e, "score", 0) >= 2) {
+            if (shown2 < 8) {
+                log("  !", get(e, "mechanism"), ":", get(e, "name"));
+                log("     ", get(e, "detail"));
+                shown2 = shown2 + 1;
+            }
+        }
+    }
+
+    // -- network census -------------------------------------------------
+    let conns = netconns();
+    let listening = 0;
+    let established = 0;
+    let udp = 0;
+    for (c in conns) {
+        if (contains(get(c, "proto", ""), "UDP")) {
+            udp = udp + 1;
+        }
+        if (contains(get(c, "state", ""), "LISTEN")) {
+            listening = listening + 1;
+        }
+        if (contains(get(c, "state", ""), "ESTAB")) {
+            established = established + 1;
+        }
+    }
+    log("");
+    log("[net] sockets:", len(conns), " listening:", listening,
+        " established:", established, " udp:", udp);
+
+    let arps = arp();
+    log("[arp] neighbours:", len(arps));
+
+    let dns = dnscache();
+    log("[dns] cached names:", len(dns));
+
+    log("");
+    log("=== end (read-only, nothing written) ===");
+}

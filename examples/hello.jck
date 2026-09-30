@@ -1,0 +1,28 @@
+// hello.jck — JOCKY language sanity check.
+// Exercises: func defs, params, return, let, while, for, operators.
+
+func greet(name) {
+    return "Hello, " + name + "!";
+}
+
+func main() {
+    log("== JOCKY SELF-TEST ==");
+    log(greet("forensics"));
+    let i = 0;
+    let total = 0;
+    while (i < 5) {
+        total = total + i;
+        i = i + 1;
+    }
+    log("sum(0..4) =", total);
+    for (ch in "jck") {
+        log("  char:", ch);
+    }
+    let even = true;
+    if ((total == 10) and even) {
+        log("checksum OK");
+    } else {
+        log("checksum FAILED");
+    }
+    log("done");
+}

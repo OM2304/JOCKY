@@ -1,0 +1,31 @@
+// netprobe.jck — read-only network connection census.
+// Categorizes sockets by protocol/state without touching them.
+
+func main() {
+    log("=== JOCKY NETPROBE ===");
+    let conns = netconns();
+    log("total sockets       :", len(conns));
+    let udp = 0;
+    let listening = 0;
+    let established = 0;
+    let other = 0;
+    for (c in conns) {
+        let state = str(get(c, "state", ""));
+        let proto = str(get(c, "proto", ""));
+        if (contains(proto, "UDP")) {
+            udp = udp + 1;
+        }
+        if (contains(state, "LISTEN")) {
+            listening = listening + 1;
+        }
+        if (contains(state, "ESTAB")) {
+            established = established + 1;
+        }
+    }
+    other = len(conns) - udp - listening - established;
+    log("LISTENING sockets   :", listening);
+    log("ESTABLISHED sockets :", established);
+    log("UDP sockets         :", udp);
+    log("other               :", other);
+    log("=== end ===");
+}

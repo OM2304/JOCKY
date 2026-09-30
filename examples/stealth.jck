@@ -1,0 +1,23 @@
+// stealth.jck — read-only triage without touching the disk:
+// enumerates the working directory and hashes matching files.
+// No files are opened for writing; nothing is persisted.
+
+func main() {
+    log("=== JOCKY STEALTH DEMO ===");
+    // Scan the examples directory: read-only, hashes any .jck/.log files.
+    let target = "examples";
+    log("scanning :", target);
+    let found = 0;
+    let files = listdir(target);
+    for (name in files) {
+        let lower = lower(name);
+        if (contains(lower, ".log") or contains(lower, ".jck")) {
+            let h = sha256(target + "/" + name);
+            log("  ", name, "->", h);
+            found = found + 1;
+        }
+    }
+    log("hashed", found, "matching file(s)");
+    log("pulse   :", hexdump("JOCKY-IN-MEMORY-OK"));
+    log("=== end ===");
+}

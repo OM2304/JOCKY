@@ -1,0 +1,115 @@
+# JOCKY CI — continuous delivery pipeline (PS req 2)
+#
+# Every push: full test suite → polymorphic gate (N builds must have N unique
+# sha256 AND byte-identical behaviour) → build release artifacts (.jcx images,
+# encrypted .jxp payloads) → upload. Runs on BOTH Windows and Ubuntu so the
+# "cross-platform compiler" PS requirement is continuously verified.
+#
+# Run the same checks locally with:
+#     python tests/test_smoke.py
+#     python ci/check_poly_uniqueness.py -n 10
+
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: tests (Python ${{ matrix.python }} / ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Smoke test suite (14 tests)
+        run: python tests/test_smoke.py
+
+      - name: Polymorphic + serialization gate (PS req 2)
+        run: python ci/check_poly_uniqueness.py -n 10
+
+  build:
+    name: build release artifacts
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build all example images
+        run: |
+          mkdir -p artifacts/images
+          for f in examples/*.jck; do
+            python -m jocky build "$f" -o "artifacts/images/$(basename "${f%.jck}").jcx"
+          done
+
+      - name: Generate polymorphic variants of the triage payload
+        run: |
+          python -m jocky poly examples/triage.jck -n 10 -o artifacts/poly
+          python -m jocky poly examples/stealth.jck -n 10 -o artifacts/poly-stealth
+
+      - name: Encrypt payloads (custom encryption, PS req)
+        run: |
+          python -m jocky enc examples/triage.jck  -o artifacts/payload_triage.jxp
+          python -m jocky enc examples/stealth.jck -o artifacts/payload_stealth.jxp
+
+      - name: Verify artifact hashes are unique
+        run: |
+          python - <<'EOF'
+          import glob, hashlib
+          hs = [hashlib.sha256(open(p, "rb").read()).hexdigest() for p in glob.glob("artifacts/**/*.jcx", recursive=True)]
+          print(f"artifacts: {len(hs)} images, {len(set(hs))} unique sha256")
+          assert len(hs) == len(set(hs)), "DUPLICATE IMAGE HASHES!"
+          EOF
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jocky-release
+          path: artifacts/
+          if-no-files-found: error
+  native-vm:
+    name: native VM (rust) + cross-VM parity (${{ matrix.os }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build native VM (release)
+        working-directory: native/vm_rs
+        run: cargo build --release
+
+      - name: Rust unit tests (value/parity/crypto/image)
+        working-directory: native/vm_rs
+        run: cargo test --lib
+
+      - name: Cross-VM parity gate (byte-identical output + JYCRYPT1 twin)
+        run: python ci/parity_check.py

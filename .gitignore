@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Rust
+native/vm_rs/target/
+
+# agent runtime state (tasks, reports, payload registry)
+agents/var/reports/
+agents/var/tasks/
+agents/var/payload_*.jxp
+agents/var/registry.json
+
+# local demo scratch
+/tmp/
+*.log
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
