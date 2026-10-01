@@ -4,13 +4,12 @@ import { notFound } from 'next/navigation';
 import { getReportById } from '@/lib/data';
 import MetadataCard from '@/components/MetadataCard';
 import TerminalWindow from '@/components/TerminalWindow';
+import ExportEvidenceButton from '@/components/ExportEvidenceButton';
 import {
-  ChevronLeft,
+  ArrowLeft,
   Server,
   Clock,
   Terminal,
-  Shield,
-  FileText,
   CornerDownRight,
 } from 'lucide-react';
 
@@ -48,57 +47,64 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-      {/* Top Breadcrumb Navigation */}
-      <div className="flex items-center gap-2 font-mono text-xs text-zinc-400">
+      {/* Prominent Back to Dashboard Navigation Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-zinc-400 hover:text-[#00ff66] transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 shadow-xs transition-all group"
         >
-          <ChevronLeft className="h-4 w-4" />
-          <span>BACK TO DASHBOARD</span>
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1 text-primary" />
+          <span>Back to Dashboard</span>
         </Link>
-        <span className="text-zinc-600">/</span>
-        <span className="text-zinc-500">REPORTS</span>
-        <span className="text-zinc-600">/</span>
-        <span className="text-[#00ff66] font-semibold truncate max-w-[200px] sm:max-w-xs">
-          {report.agent} [{report.task}]
-        </span>
+
+        {/* Breadcrumb Path Context */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+          <span>Reports Census</span>
+          <span className="text-muted-foreground/60">/</span>
+          <span className="text-foreground font-medium truncate max-w-[200px] sm:max-w-xs">
+            {report.agent}
+          </span>
+          <span className="text-muted-foreground/60">•</span>
+          <span className="text-muted-foreground font-mono">{report.task}</span>
+        </div>
       </div>
 
       {/* Header showing Agent Name and Timestamp */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#1e2638] pb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[#00ff66]">
-            <span className="h-2 w-2 rounded-full bg-[#00ff66] animate-pulse" />
-            <span>AGENT TELEMETRY REPORT RECORD</span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase">
+            <span className="h-2 w-2 rounded-full bg-primary" />
+            <span>Agent Telemetry Record</span>
           </div>
-          <h1 className="mt-1 font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <Server className="h-7 w-7 text-cyan-400" />
+          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <Server className="h-6 w-6 text-primary" />
             <span>{report.agent}</span>
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-zinc-400">
+          <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-mono">
             <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-zinc-500" />
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <span>Timestamp: {formatTimestamp(report.ts)}</span>
             </div>
             {report.parsedSummary?.host && (
-              <div className="flex items-center gap-1.5 text-zinc-300">
-                <CornerDownRight className="h-3.5 w-3.5 text-zinc-500" />
+              <div className="flex items-center gap-1.5 text-foreground">
+                <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Host: {report.parsedSummary.host}</span>
               </div>
             )}
             {report.parsedSummary?.os && (
-              <div className="flex items-center gap-1.5 text-zinc-300">
+              <div className="flex items-center gap-1.5 text-foreground">
                 <span>OS: {report.parsedSummary.os}</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-xs">
-          <div className="rounded-xl border border-[#1e2638] bg-[#0c0e14] px-3.5 py-2 text-zinc-300">
-            TASK: <span className="text-[#00ff66] font-semibold">{report.task}</span>
+        <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+          <div className="rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-xs">
+            Task ID: <span className="text-foreground font-semibold">{report.task}</span>
           </div>
+
+          <ExportEvidenceButton report={report} />
         </div>
       </div>
 
@@ -111,13 +117,13 @@ export default async function ReportDetailPage({ params }: PageProps) {
       <section aria-label="Terminal Execution Log" className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-[#00ff66]" />
-            <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-300">
+            <Terminal className="h-4 w-4 text-primary" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
               Raw Triage Terminal Output
             </h2>
           </div>
-          <span className="font-mono text-[11px] text-zinc-500">
-            RAM Execution // In-Memory Console Stream
+          <span className="font-mono text-[11px] text-muted-foreground">
+            In-Memory Stream
           </span>
         </div>
 

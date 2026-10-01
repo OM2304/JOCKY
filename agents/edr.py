@@ -770,7 +770,7 @@ def fmt_report(products: List[Dict], hooks: Dict[str, List[Dict]],
 # Demo mode -- synthetic positives built from REAL host data.
 # ---------------------------------------------------------------------------
 
-def run_demo() -> int:
+def run_demo(as_json: bool = False) -> int:
     modules = loaded_module_map()
     products = discover_products(modules)
     real_hooks = scan_hooks(modules)
@@ -839,6 +839,36 @@ def run_demo() -> int:
         "likely_hooks": sum(1 for v in real_hooks.values() for r in v if r["likely_hook"])
                          + len(synthetic.get("ntdll.dll", [])),
     }
+    if as_json:
+        combined_hooks = {}
+        for k, v in synthetic.items():
+            combined_hooks.setdefault(k, []).extend(v)
+        for k, v in real_hooks.items():
+            combined_hooks.setdefault(k, []).extend(v)
+
+        def _serialize_row(r):
+            res = {}
+            for kk, vv in r.items():
+                if kk == "target" and isinstance(vv, int):
+                    res[kk] = f"0x{vv:x}"
+                elif isinstance(vv, (bytes, bytearray)):
+                    res[kk] = vv.hex()
+                else:
+                    res[kk] = vv
+            return res
+
+        out = {
+            "host": os.environ.get("COMPUTERNAME", "") or platform.node(),
+            "products": products,
+            "security_center2": [],
+            "hooks": {k: [_serialize_row(r) for r in v] for k, v in combined_hooks.items()},
+            "hooks_list": [_serialize_row(r) for v in combined_hooks.values() for r in v],
+            "summary": summary,
+            "mode": "synthetic_demo"
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+
     sys.stdout.write(fmt_report(products, synthetic, [], summary, synthetic=True))
     if real_hooks:
         sys.stdout.write("\n (also observed live on this host: "
@@ -877,7 +907,7 @@ def main(argv=None) -> int:
         sys.stdout.write(ROADMAP)
         return 0
     if a.demo:
-        return run_demo()
+        return run_demo(as_json=a.json)
     if not is_windows:
         sys.stdout.write("edr.py is Windows-only (ntdll/kernel32 stub "
                          "comparison); nothing to scan here.\n")

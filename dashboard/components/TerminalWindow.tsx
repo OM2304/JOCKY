@@ -67,7 +67,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
     // Section headers: === JOCKY HOST TRIAGE ===
     if (trimmed.startsWith('===') && trimmed.endsWith('===')) {
       return (
-        <span className="font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
+        <span className="font-bold text-sky-400">
           {line}
         </span>
       );
@@ -76,7 +76,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
     // High severity / alert lines: starts with !
     if (trimmed.startsWith('!')) {
       return (
-        <span className="font-semibold text-amber-300 bg-amber-500/10 px-1 py-0.5 rounded border-l-2 border-amber-400">
+        <span className="font-medium text-amber-300 bg-amber-500/10 px-1 py-0.5 rounded-sm border-l-2 border-amber-400">
           {line}
         </span>
       );
@@ -88,10 +88,10 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
       if (tagMatch) {
         return (
           <>
-            <span className="font-bold text-[#00ff66] drop-shadow-[0_0_6px_rgba(0,255,102,0.4)]">
+            <span className="font-semibold text-emerald-400">
               {tagMatch[1]}
             </span>
-            <span className="text-zinc-200">{tagMatch[2]}</span>
+            <span className="text-slate-200">{tagMatch[2]}</span>
           </>
         );
       }
@@ -102,63 +102,63 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
     if (kvMatch) {
       return (
         <>
-          <span className="text-cyan-400 font-semibold">{kvMatch[1]}</span>
-          <span className="text-emerald-300">{kvMatch[2]}</span>
+          <span className="text-sky-300 font-medium">{kvMatch[1]}</span>
+          <span className="text-slate-200">{kvMatch[2]}</span>
         </>
       );
     }
 
     // Flagged / Anomaly keywords
     if (line.includes('flagged:') || line.includes('anomaly') || line.includes('scored>=')) {
-      return <span className="text-amber-300">{line}</span>;
+      return <span className="text-amber-300 font-medium">{line}</span>;
     }
 
-    // Standard output in classic neon-green/emerald terminal phosphor style
-    return <span className="text-[#39ff14] text-opacity-90">{line}</span>;
+    // Standard output in clean, readable high-contrast slate text
+    return <span className="text-slate-300">{line}</span>;
   };
 
   return (
     <div
-      className={`rounded-2xl border border-[#1e2638] bg-[#0e1117] shadow-2xl transition-all ${
+      className={`overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-md transition-all ${
         isFullScreen ? 'fixed inset-4 z-50 flex flex-col' : 'relative'
       }`}
     >
       {/* Terminal Title Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1c2434] bg-[#090b10] px-4 py-3 rounded-t-2xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/80 px-4 py-2.5">
         {/* Window Controls & Status */}
         <div className="flex items-center gap-3">
-          {/* Mac/Linux Terminal Dots */}
+          {/* Subtle Window Dots */}
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-full bg-[#ff5f56] inline-block shadow-[0_0_6px_rgba(255,95,86,0.6)]"></span>
-            <span className="h-3 w-3 rounded-full bg-[#ffbd2e] inline-block shadow-[0_0_6px_rgba(255,189,46,0.6)]"></span>
-            <span className="h-3 w-3 rounded-full bg-[#27c93f] inline-block shadow-[0_0_6px_rgba(39,201,63,0.6)]"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80 inline-block"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
           </div>
 
-          <div className="h-4 w-[1px] bg-zinc-700" />
+          <div className="h-3.5 w-px bg-slate-800" />
 
           {/* Terminal Session Header */}
-          <div className="flex items-center gap-2 font-mono text-xs text-zinc-300">
-            <Terminal className="h-4 w-4 text-[#00ff66]" />
-            <span className="font-semibold text-white">
-              tty0@jocky-vm: ~/{agentName || 'agent'}
+          <div className="flex items-center gap-2 font-mono text-xs text-slate-300">
+            <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="font-semibold text-slate-100">
+              {agentName || 'agent'}@jocky-ram
             </span>
-            <span className="hidden sm:inline rounded bg-[#00ff66]/10 px-1.5 py-0.5 text-[10px] font-mono text-[#00ff66] border border-[#00ff66]/30">
-              IN-MEMORY PAYLOAD
+            <span className="hidden sm:inline rounded bg-slate-800 px-1.5 py-0.2 text-[10px] text-slate-400 border border-slate-700">
+              IN-MEMORY LOG
             </span>
           </div>
         </div>
 
         {/* Terminal Controls Bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Quick Line Search */}
           <div className="relative hidden sm:block">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filter terminal..."
-              className="h-7 w-36 rounded-md border border-[#1e2638] bg-[#121622] pl-8 pr-2 font-mono text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:border-[#00ff66] focus:outline-none focus:w-48 transition-all"
+              placeholder="Filter log..."
+              className="h-7 w-32 rounded-md border border-slate-800 bg-slate-950 pl-7 pr-2 font-mono text-[11px] text-slate-200 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:w-44 transition-all"
             />
           </div>
 
@@ -167,8 +167,8 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
             onClick={() => setShowLineNumbers(!showLineNumbers)}
             className={`flex h-7 items-center gap-1 rounded-md px-2 font-mono text-[11px] border transition-colors ${
               showLineNumbers
-                ? 'border-[#00ff66]/40 bg-[#00ff66]/10 text-[#00ff66]'
-                : 'border-[#1e2638] bg-[#121622] text-zinc-400 hover:text-zinc-200'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle line numbers"
           >
@@ -181,8 +181,8 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
             onClick={() => setWordWrap(!wordWrap)}
             className={`flex h-7 items-center gap-1 rounded-md px-2 font-mono text-[11px] border transition-colors ${
               wordWrap
-                ? 'border-[#00ff66]/40 bg-[#00ff66]/10 text-[#00ff66]'
-                : 'border-[#1e2638] bg-[#121622] text-zinc-400 hover:text-zinc-200'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle word wrap"
           >
@@ -193,7 +193,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
           {/* Download Raw Log */}
           <button
             onClick={handleDownload}
-            className="flex h-7 items-center gap-1 rounded-md border border-[#1e2638] bg-[#121622] px-2 font-mono text-[11px] text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+            className="flex h-7 items-center gap-1 rounded-md border border-slate-800 bg-slate-950 px-2 font-mono text-[11px] text-slate-300 hover:text-white transition-colors"
             title="Download log"
           >
             <Download className="h-3 w-3" />
@@ -203,16 +203,16 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
           {/* Copy Output Button */}
           <button
             onClick={handleCopy}
-            className="flex h-7 items-center gap-1.5 rounded-md border border-[#00ff66]/40 bg-[#00ff66]/15 px-2.5 font-mono text-[11px] font-semibold text-[#00ff66] hover:bg-[#00ff66]/25 transition-colors shadow-[0_0_10px_rgba(0,255,102,0.15)]"
+            className="flex h-7 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800 px-2.5 font-mono text-[11px] font-medium text-slate-200 hover:bg-slate-750 hover:text-white transition-colors"
           >
             {copied ? (
               <>
-                <Check className="h-3.5 w-3.5" />
-                <span>Copied</span>
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-emerald-400">Copied</span>
               </>
             ) : (
               <>
-                <Copy className="h-3.5 w-3.5" />
+                <Copy className="h-3.5 w-3.5 text-slate-400" />
                 <span>Copy</span>
               </>
             )}
@@ -221,7 +221,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
           {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullScreen(!isFullScreen)}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#1e2638] bg-[#121622] text-zinc-400 hover:text-white transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-800 bg-slate-950 text-slate-400 hover:text-white transition-colors"
             title={isFullScreen ? 'Exit fullscreen' : 'Fullscreen'}
           >
             {isFullScreen ? (
@@ -235,7 +235,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
 
       {/* Terminal Body */}
       <div
-        className={`relative bg-[#0c0e14] p-4 sm:p-6 font-mono text-xs leading-relaxed selection:bg-[#00ff66]/30 selection:text-white overflow-auto ${
+        className={`relative bg-slate-950 p-4 sm:p-5 font-mono text-xs leading-relaxed selection:bg-slate-800 selection:text-white overflow-auto ${
           isFullScreen ? 'flex-1' : 'max-h-[640px]'
         }`}
         style={{
@@ -243,11 +243,8 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
             'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
         }}
       >
-        {/* Subtle scanline effect overlay */}
-        <div className="terminal-scanline absolute inset-0 pointer-events-none opacity-40" />
-
         {filteredLines.length === 0 ? (
-          <div className="py-8 text-center text-zinc-500 font-mono">
+          <div className="py-8 text-center text-slate-500 font-mono">
             {lines.length === 0
               ? 'No execution output returned by agent.'
               : `No output matching "${searchFilter}".`}
@@ -262,7 +259,7 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
                 }`}
               >
                 {showLineNumbers && (
-                  <span className="select-none text-zinc-600 text-right w-8 shrink-0 tabular-nums">
+                  <span className="select-none text-slate-600 text-right w-8 shrink-0 tabular-nums">
                     {originalIndex}
                   </span>
                 )}
@@ -274,27 +271,27 @@ export default function TerminalWindow({ output, agentName, taskId }: TerminalWi
       </div>
 
       {/* Terminal Footer Status Bar */}
-      <div className="flex items-center justify-between border-t border-[#1c2434] bg-[#090b10] px-4 py-2 font-mono text-[10px] text-zinc-500 rounded-b-2xl">
+      <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/80 px-4 py-2 font-mono text-[10px] text-slate-400">
         <div className="flex items-center gap-3">
-          <span className="text-zinc-400">
-            TOTAL LINES: <span className="text-zinc-200 font-semibold">{lines.length}</span>
+          <span>
+            LINES: <span className="text-slate-200 font-semibold">{lines.length}</span>
           </span>
           <span>•</span>
-          <span className="text-zinc-400">
-            BYTES: <span className="text-zinc-200 font-semibold">{new Blob([output]).size}</span>
+          <span>
+            BYTES: <span className="text-slate-200 font-semibold">{new Blob([output]).size}</span>
           </span>
           {searchFilter && (
             <>
               <span>•</span>
-              <span className="text-[#00ff66]">
+              <span className="text-emerald-400">
                 MATCHING: {filteredLines.length}
               </span>
             </>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-[#00ff66]">
-          <Shield className="h-3 w-3" />
-          <span className="tracking-wide">ZERO ARTIFACTS PERSISTED ON AGENT</span>
+        <div className="flex items-center gap-1.5 text-slate-400">
+          <Shield className="h-3 w-3 text-emerald-400" />
+          <span>RAM Execution • Clean Footprint</span>
         </div>
       </div>
     </div>

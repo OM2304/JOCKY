@@ -571,7 +571,7 @@ def fmt_report(r: dict) -> str:
 DEMO_FILE = "RTCore64.sys"     # MSI afterburner victim (CVE-2018-12639)
 
 
-def run_demo() -> int:
+def run_demo(as_json: bool = False) -> int:
     """Synthetic positive-detection demo.
 
     Stages a NON-EXECUTABLE text stub (clearly marked, not a real driver
@@ -590,6 +590,12 @@ def run_demo() -> int:
                 "the real signed RTCore64.sys (see loldrivers.io).")
     try:
         r = scan(extra_paths=[demo_dir])
+        for h in r.get("findings", []):
+            h["loaded_in_kernel"] = h.get("loaded", False)
+            h["name"] = h.get("file", DEMO_FILE)
+        if as_json:
+            print(json.dumps(r, indent=2))
+            return 0
         print(fmt_report(r))
         if not r["findings"]:
             print("[demo] FAIL: expected at least one filename match")
@@ -623,8 +629,11 @@ def main(argv=None):
                    help="additional dirs to walk (repeatable)")
     a = p.parse_args(argv)
     if a.demo:
-        return run_demo()
+        return run_demo(as_json=a.json)
     r = scan(db_path=a.db_json, extra_paths=a.scan_custom)
+    for h in r.get("findings", []):
+        h["loaded_in_kernel"] = h.get("loaded", False)
+        h["name"] = h.get("file", "")
     if a.json:
         print(json.dumps(r, indent=2))
     else:

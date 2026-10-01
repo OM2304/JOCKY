@@ -1,6 +1,11 @@
 // triage.jck — read-only incident-report triage.
 // Identity, process census + anomalies, persistence sweep, network census,
 // ARP neighbours, DNS cache. Nothing is written; nothing is spawned.
+// 
+// ADVANCED THREAT HUNTING FEATURES ENABLED:
+// - Process to Network Cross-Correlation (C2/Beacon detection)
+// - Process to Persistence Cross-Correlation (Active foothold detection)
+// - DNS Cache Threat Intel (Data exfiltration detection)
 
 func main() {
     log("=== JOCKY HOST TRIAGE ===");
@@ -11,7 +16,7 @@ func main() {
         get(info, "machine"), "| py", get(info, "python"));
     log("cwd   :", cwd());
 
-    // -- process census + anomalies -----------------------------------
+    // -- process census + anomalies (ORIGINAL BASELINE) ---------------
     let tree = proctree();
     let anomalies = 0;
     for (n in tree) {
@@ -32,7 +37,53 @@ func main() {
         }
     }
 
-    // -- persistence sweep --------------------------------------------
+    // -- network census (ORIGINAL BASELINE) -----------------------------
+    let conns = netconns();
+    let listening = 0;
+    let established = 0;
+    let udp = 0;
+    for (c in conns) {
+        if (contains(get(c, "proto", ""), "UDP")) {
+            udp = udp + 1;
+        }
+        if (contains(get(c, "state", ""), "LISTEN")) {
+            listening = listening + 1;
+        }
+        if (contains(get(c, "state", ""), "ESTAB")) {
+            established = established + 1;
+        }
+    }
+    log("");
+    log("[net] sockets:", len(conns), " listening:", listening,
+        " established:", established, " udp:", udp);
+
+    // -- ADVANCED: Process <-> Network Cross-Correlation ----------------
+    if (anomalies > 0) {
+        log("");
+        log("[x-correlation] Checking anomalous processes for active C2 sockets...");
+        let c2_found = 0;
+        for (n in tree) {
+            if (get(n, "anomaly", false)) {
+                let p_pid = get(n, "pid");
+                for (c in conns) {
+                    if (get(c, "pid") == p_pid) {
+                        let state = str(get(c, "state", ""));
+                        if (contains(state, "ESTAB") or contains(state, "LISTEN")) {
+                            log("  >>> CRITICAL C2 ALERT: Flagged process maintains active socket!");
+                            log("      Process :", get(n, "name"), "(PID:", p_pid, ")");
+                            log("      Socket  :", get(c, "proto"), get(c, "local"), "->", get(c, "remote"), "(", state, ")");
+                            c2_found = c2_found + 1;
+                        }
+                    }
+                }
+            }
+        }
+        if (c2_found == 0) {
+            log("  > No active network sockets found for flagged processes.");
+        }
+    }
+
+    // -- persistence sweep (ORIGINAL BASELINE) --------------------------
     let pers = persistence();
     let hot = 0;
     for (e in pers) {
@@ -53,31 +104,51 @@ func main() {
         }
     }
 
-    // -- network census -------------------------------------------------
-    let conns = netconns();
-    let listening = 0;
-    let established = 0;
-    let udp = 0;
-    for (c in conns) {
-        if (contains(get(c, "proto", ""), "UDP")) {
-            udp = udp + 1;
-        }
-        if (contains(get(c, "state", ""), "LISTEN")) {
-            listening = listening + 1;
-        }
-        if (contains(get(c, "state", ""), "ESTAB")) {
-            established = established + 1;
+    // -- ADVANCED: Process <-> Persistence Cross-Correlation ------------
+    if (hot > 0 and anomalies > 0) {
+        log("");
+        log("[x-correlation] Cross-referencing active anomalies with persistence hooks...");
+        let hook_found = 0;
+        for (e in pers) {
+            if (get(e, "score", 0) >= 2) {
+                let detail = lower(str(get(e, "detail")));
+                for (n in tree) {
+                    if (get(n, "anomaly", false)) {
+                        let p_name = lower(str(get(n, "name")));
+                        if (len(p_name) > 3 and contains(detail, p_name)) {
+                            log("  >>> CRITICAL FOOTHOLD ALERT: Flagged process matches active persistence hook!");
+                            log("      Process :", get(n, "name"), "(PID:", get(n, "pid"), ")");
+                            log("      Hook    :", get(e, "mechanism"), "->", get(e, "name"));
+                            hook_found = hook_found + 1;
+                        }
+                    }
+                }
+            }
         }
     }
-    log("");
-    log("[net] sockets:", len(conns), " listening:", listening,
-        " established:", established, " udp:", udp);
 
     let arps = arp();
+    log("");
     log("[arp] neighbours:", len(arps));
 
     let dns = dnscache();
     log("[dns] cached names:", len(dns));
+
+    // -- ADVANCED: DNS Cache Threat Intelligence ------------------------
+    let sus_dns = 0;
+    for (d in dns) {
+        let dname = lower(str(get(d, "name", "")));
+        // Identify dynamic DNS, common exfiltration tunnels, and drop-sites
+        if (contains(dname, "ngrok") or contains(dname, "duckdns") or contains(dname, "pastebin") or contains(dname, "raw.githubusercontent")) {
+            if (sus_dns < 5) {
+                log("  ! Suspicious DNS cache entry:", dname, "(", get(d, "type", ""), ")");
+            }
+            sus_dns = sus_dns + 1;
+        }
+    }
+    if (sus_dns > 0) {
+        log("  > Total suspicious DNS entries flagged:", sus_dns);
+    }
 
     log("");
     log("=== end (read-only, nothing written) ===");

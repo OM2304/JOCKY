@@ -54,9 +54,11 @@ def run_once(args) -> dict:
     ping = _http(args.controller, "/api/v1/ping", args.front, args.cdn)
     print(f"[agent] ping ok (front={json.loads(ping).get('front')})")
 
-    task_json = _http(args.controller, "/api/v1/task", args.front, args.cdn)
-    info = json.loads(task_json)
-    tid = info.get("task")
+    tid = getattr(args, "task", None)
+    if not tid:
+        task_json = _http(args.controller, "/api/v1/task", args.front, args.cdn)
+        info = json.loads(task_json)
+        tid = info.get("task")
     if not tid:
         print("[agent] no tasks queued")
         return {"task": None, "executed": False}
@@ -98,6 +100,7 @@ def main(argv=None):
                    help="front domain presented in Host header")
     p.add_argument("--interval", type=float, default=5.0)
     p.add_argument("--once", action="store_true", help="single poll, then exit")
+    p.add_argument("--task", default=None, help="specific task ID to pull and execute")
     p.add_argument("--key-env", default="JOCKY_KEY")
     p.add_argument("--agent-name", default=None,
                    help="name reported to the controller (default: hostname)")

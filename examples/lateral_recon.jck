@@ -1,0 +1,120 @@
+// lateral_recon.jck — Advanced Lateral Movement Recon & Credential Audit.
+// Audits ARP cache for hypervisors/gateways and scans user directories
+// for exposed plain-text credentials (SSH, AWS, Kube) to assess lateral risk.
+
+func main() {
+    log("=== JOCKY LATERAL RECON & CREDENTIAL AUDIT ===");
+    let info = sysinfo();
+    let is_win = contains(get(info, "os", ""), "Windows");
+
+    // --- 1. NETWORK NEIGHBORHOOD (ARP MAPPING) ---
+    let neighbors = arp();
+    log("[network] Auditing", len(neighbors), "physical/logical neighbors in ARP cache...");
+    
+    let high_value_targets = 0;
+    for (n in neighbors) {
+        let mac = lower(get(n, "mac", ""));
+        let ip = get(n, "ip", "");
+        
+        // OUI lookups for common virtual/infrastructure targets
+        // VMware (00:50:56, 00:0c:29), VirtualBox (08:00:27), Cisco (00:40:96)
+        let is_vmware = contains(mac, "00:50:56") or contains(mac, "00:0c:29");
+        let is_vbox = contains(mac, "08:00:27");
+        let is_cisco = contains(mac, "00:40:96") or contains(mac, "00:00:0c");
+        
+        if (is_vmware or is_vbox or is_cisco) {
+            let vendor = "Unknown";
+            if (is_vmware) { vendor = "VMware Hypervisor"; }
+            if (is_vbox) { vendor = "VirtualBox Instance"; }
+            if (is_cisco) { vendor = "Cisco Gateway/Appliance"; }
+            
+            log("  ! High-Value Lateral Target:", ip, "(", vendor, "-", mac, ")");
+            high_value_targets = high_value_targets + 1;
+        }
+    }
+    if (high_value_targets == 0) {
+        log("  > No obvious infrastructure targets found in ARP cache.");
+    }
+
+    // --- 2. CREDENTIAL EXPOSURE AUDIT ---
+    let home_dir = env("HOME");
+    if (is_win and home_dir == "") {
+        home_dir = env("USERPROFILE");
+    }
+    
+    if (home_dir != "") {
+        log("\n[credentials] Auditing user profile for exposed secrets:", home_dir);
+        
+        let exposed = 0;
+        
+        // JOCKY array generation via split() native
+        let paths_str = ".ssh,.aws,.kube,AppData/Roaming/gcloud";
+        if (is_win) {
+            paths_str = ".ssh,.aws,.kube,AppData\\Roaming\\gcloud";
+        }
+        let paths_to_check = split(paths_str, ",");
+        
+        for (sub_path in paths_to_check) {
+            let target_dir = home_dir + "/" + sub_path;
+            let files = listdir(target_dir);
+            
+            // listdir returns an array. If directory is missing, it returns ["<error...>"]
+            let valid_dir = true;
+            if (len(files) > 0) {
+                let first = str(get(files, 0, ""));
+                if (contains(first, "<error")) {
+                    valid_dir = false;
+                }
+            } else {
+                valid_dir = false;
+            }
+            
+            if (valid_dir) {
+                for (file in files) {
+                    let lower_file = lower(file);
+                    
+                    // High risk file signatures
+                    let is_ssh_priv = contains(lower_file, "id_rsa") or contains(lower_file, "id_ed25519") or contains(lower_file, ".pem");
+                    let is_cloud_cred = contains(lower_file, "credentials") or contains(lower_file, "config") or contains(lower_file, "application_default_credentials.json");
+                    
+                    // We don't flag public keys as critical vulnerabilities
+                    if (contains(lower_file, ".pub")) {
+                        is_ssh_priv = false;
+                    }
+                    
+                    if (is_ssh_priv or is_cloud_cred) {
+                        let full_path = target_dir + "/" + file;
+                        let stats = fstat(full_path);
+                        let fsize = get(stats, "size", 0);
+                        
+                        log("  >>> HIGH RISK: Plain-text secret exposed on disk!");
+                        log("      File :", full_path, "(", fsize, "bytes )");
+                        if (is_cloud_cred) {
+                            log("      Type : Cloud/Infrastructure Credential");
+                        } else {
+                            log("      Type : Private SSH Key");
+                        }
+                        
+                        exposed = exposed + 1;
+                        
+                        // Advanced: If Linux, check if SSH key permissions are too open (e.g., world-readable)
+                        if (not is_win and is_ssh_priv) {
+                            let mode = str(get(stats, "mode", ""));
+                            // 0o100600 is typical for -rw-------. If it contains 644 or 777, it's globally exposed.
+                            if (contains(mode, "644") or contains(mode, "777") or contains(mode, "666")) {
+                                log("      Perms: CRITICAL VULNERABILITY! Key is world/group readable (", mode, ")");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (exposed == 0) {
+            log("  > No plain-text credentials found in standard audit paths.");
+        }
+    } else {
+        log("\n[credentials] Could not resolve user home directory.");
+    }
+    
+    log("\n=== end ===");
+}

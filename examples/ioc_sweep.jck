@@ -1,0 +1,102 @@
+// ioc_sweep.jck — Advanced In-Memory Indicator of Compromise (IoC) Scanner.
+// Features: Magic Byte/Header validation, safe-buffered YARA-lite string 
+// hunting, and strict file size controls to prevent memory exhaustion.
+
+func main() {
+    log("=== JOCKY ADVANCED IOC SWEEP ===");
+    let info = sysinfo();
+    let target_dir = "/tmp";
+    let is_win = contains(get(info, "os", ""), "Windows");
+    
+    // Attackers usually stage payloads in world-writable directories
+    if (is_win) {
+        target_dir = "C:\\Users\\Public";
+    }
+
+    log("Targeting high-risk staging directory:", target_dir);
+    let files = listdir(target_dir);
+    let matched_hashes = 0;
+    let matched_strings = 0;
+    let matched_magic = 0;
+
+    // Example bad hash (in a real scenario, this would be fed by Threat Intel)
+    let bad_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; 
+
+    for (name in files) {
+        let full_path = target_dir + "/" + name;
+        let stats = fstat(full_path);
+        
+        // Ensure the file is readable and hasn't been locked/deleted
+        if (get(stats, "error") == none) {
+            let file_size = get(stats, "size", 0);
+            let file_hash = sha256(full_path);
+            let lower_name = lower(name);
+            
+            // --- 1. HASH VERIFICATION ---
+            if (file_hash == bad_hash) {
+                log("  >>> CRITICAL: Known Malicious Hash Detected!");
+                log("      File:", full_path, "(", file_size, "bytes )");
+                log("      Hash:", file_hash);
+                matched_hashes = matched_hashes + 1;
+            }
+
+            // --- 2. MAGIC BYTE / HEADER ANALYSIS ---
+            // Read only the first 4 bytes to check file signatures (Magic Bytes)
+            let header = readfile(full_path, 4);
+            let hex_header = hexdump(header);
+            
+            if (is_win) {
+                // Check for 'MZ' (4d 5a) executable header in non-executable files
+                if (contains(hex_header, "4d 5a")) {
+                    if (not contains(lower_name, ".exe") and not contains(lower_name, ".dll") and not contains(lower_name, ".sys")) {
+                        log("  >>> WARNING: File Extension / Magic Byte Mismatch!");
+                        log("      File claims to be safe but has an Executable (MZ) header:", name);
+                        matched_magic = matched_magic + 1;
+                    }
+                }
+            } else {
+                // Check for Linux ELF (7f 45 4c 46) executable header in media/text files
+                if (contains(hex_header, "7f 45 4c 46")) {
+                    if (contains(lower_name, ".txt") or contains(lower_name, ".jpg") or contains(lower_name, ".png")) {
+                        log("  >>> WARNING: File Extension / Magic Byte Mismatch!");
+                        log("      File claims to be media/text but has an Executable (ELF) header:", name);
+                        matched_magic = matched_magic + 1;
+                    }
+                }
+            }
+
+            // --- 3. YARA-LITE STRING HUNTING ---
+            // Safety guard: Only read files under 5MB into RAM for string analysis
+            if (file_size > 0 and file_size < 5000000) {
+                if (contains(lower_name, ".bat") or contains(lower_name, ".ps1") or contains(lower_name, ".sh") or contains(lower_name, ".vbs")) {
+                    
+                    let content = lower(readfile(full_path, 5000000));
+                    let is_sus = false;
+                    let trigger = "";
+                    
+                    // Specific behavioral string detection
+                    if (contains(content, "invoke-mimikatz")) { is_sus = true; trigger = "Invoke-Mimikatz (Credential Theft)"; }
+                    if (contains(content, "bypass -noprofile")) { is_sus = true; trigger = "PowerShell Execution Policy Bypass"; }
+                    if (contains(content, "hidden -enc")) { is_sus = true; trigger = "Hidden Encoded Payload"; }
+                    if (contains(content, "/dev/tcp/")) { is_sus = true; trigger = "Bash Reverse Shell"; }
+                    if (contains(content, "vssadmin delete shadows")) { is_sus = true; trigger = "Ransomware Shadow Copy Deletion"; }
+
+                    if (is_sus) {
+                        log("  >>> CRITICAL: Malicious Strings Detected in Script!");
+                        log("      File   :", full_path);
+                        log("      Trigger:", trigger);
+                        matched_strings = matched_strings + 1;
+                    }
+                }
+            }
+        }
+    }
+
+    if (matched_hashes == 0 and matched_strings == 0 and matched_magic == 0) {
+        log("  > No Indicators of Compromise found in staging directory.");
+    } else {
+        log("\n[summary] Hash matches:", matched_hashes, "| String matches:", matched_strings, "| Magic Byte mismatches:", matched_magic);
+    }
+    
+    log("=== end ===");
+}

@@ -1,0 +1,108 @@
+// sandbox_guard.jck — Anti-Analysis, Evasion & Hostile Environment Gatekeeper.
+// Protects sensitive forensic payloads from running inside automated analysis
+// sandboxes, virtualized honeypots, or under active debugger/monitor instrumentation.
+//
+// HEURISTICS APPLIED:
+// - Dynamic Analysis & Debugger Process Enumeration
+// - Hypervisor & Virtualization ARP Footprint Inspection
+// - Minimalist Process Census Scoring (Typical of disposable VMs)
+// - Predictable Analyst Artifacts (Hostnames & Usernames)
+
+func main() {
+    log("=== JOCKY ENVIRONMENT GUARD & ANTI-ANALYSIS ===");
+    let info = sysinfo();
+    let is_win = contains(get(info, "os", ""), "Windows");
+    let hostility_score = 0;
+
+    // --- 1. PROCESS-LEVEL INSTRUMENTATION & DEBUGGER HUNT ---
+    let p_list = procs();
+    log("[process-audit] Inspecting", len(p_list), "resident processes for analysis tools...");
+
+    // Sandboxes often operate in minimal, freshly-spawned VMs
+    if (len(p_list) < 35) {
+        log("  ! SUSPICIOUS: Abnormally low process density (", len(p_list), "< 35 ). Possible stripped VM sandbox.");
+        hostility_score = hostility_score + 2;
+    }
+
+    // Tools commonly deployed by reverse engineers and dynamic sandbox harnesses
+    let tool_signatures = "wireshark,procmon,procexp,processhacker,tcpview,fiddler,x64dbg,x32dbg,ida64,ghidra,vboxservice,vboxtray,vmtoolsd,qemu-ga";
+    let tools = split(tool_signatures, ",");
+
+    let tools_detected = 0;
+    for (p in p_list) {
+        let p_name = lower(get(p, "name", ""));
+        for (target_tool in tools) {
+            if (contains(p_name, target_tool)) {
+                log("  >>> HOSTILE TOOL DETECTED:", p_name, "(PID:", get(p, "pid"), ")");
+                tools_detected = tools_detected + 1;
+                hostility_score = hostility_score + 3;
+            }
+        }
+    }
+    if (tools_detected == 0) {
+        log("  > No active debuggers, sniffers, or hypervisor daemons detected.");
+    }
+
+    // --- 2. VIRTUALIZATION & HONEYPOT ARP SCAN ---
+    log("\n[network-audit] Inspecting ARP table for virtualization signatures...");
+    let neighbors = arp();
+    let virt_arps = 0;
+    for (n in neighbors) {
+        let mac = lower(get(n, "mac", ""));
+        // QEMU/KVM (52:54:00), VirtualBox (08:00:27), VMware (00:05:69)
+        if (contains(mac, "52:54:00") or contains(mac, "08:00:27") or contains(mac, "00:05:69")) {
+            log("  ! Virtual gateway/hypervisor adapter matched:", get(n, "ip"), "->", mac);
+            virt_arps = virt_arps + 1;
+            hostility_score = hostility_score + 1;
+        }
+    }
+    if (virt_arps == 0) {
+        log("  > Hardware ARP footprint matches standard bare-metal topology.");
+    }
+
+    // --- 3. IDENTITY & ENVIRONMENT ARTIFACTS ---
+    log("\n[environment-audit] Checking host naming heuristics...");
+    let hname = upper(hostname());
+    let username = "";
+    if (is_win) {
+        username = upper(env("USERNAME"));
+    } else {
+        username = upper(env("USER"));
+    }
+
+    let sus_names = "SANDBOX,CUCKOO,MALTEST,MALWARE,SAMPLE,VIRUS,TEST-PC,CURRENTUSER,WIN7-PC";
+    let sus_list = split(sus_names, ",");
+
+    let identity_flagged = false;
+    for (sus in sus_list) {
+        if (contains(hname, sus) or (username != "" and contains(username, sus))) {
+            log("  ! Host/User matches classic sandbox naming convention:", hname, "/", username);
+            identity_flagged = true;
+            hostility_score = hostility_score + 2;
+        }
+    }
+    if (not identity_flagged) {
+        log("  > Host identity appears consistent with legitimate standard deployment.");
+    }
+
+    // --- 4. EVASION & BAILOUT DECISION ---
+    log("");
+    log("[verdict] Computed Environmental Hostility Score:", hostility_score, "/ 10");
+
+    if (hostility_score >= 3) {
+        log(">>> EVASION TRIGGERED: Environment flagged as hostile / sandbox.");
+        log(">>> Halting execution to prevent reverse engineering of internal logic.");
+        
+        // Artificial delay to exhaust automated sandbox recording timeouts
+        log(">>> Burning dynamic analysis execution window (5000ms delay)...");
+        sleep(5000);
+
+        log(">>> Execution safely aborted. Zero artifacts dropped.");
+        log("=== end ===");
+        return none;
+    }
+
+    log("[+] Environment integrity verified clean. Safe to unpack primary forensic payload.");
+    log("pulse   :", hexdump("EXECUTION-AUTHORIZED-BARE-METAL"));
+    log("=== end ===");
+}

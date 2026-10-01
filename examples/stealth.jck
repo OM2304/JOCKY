@@ -1,6 +1,10 @@
 // stealth.jck — read-only triage without touching the disk:
 // enumerates the working directory and hashes matching files.
 // No files are opened for writing; nothing is persisted.
+//
+// ADVANCED THREAT HUNTING FEATURES ENABLED:
+// - High-Risk Staging Directory Audit (/tmp or C:\Users\Public)
+// - Mathematical Timestomping Detection (mtime < ctime anomaly)
 
 func main() {
     log("=== JOCKY STEALTH DEMO ===");
@@ -18,6 +22,57 @@ func main() {
         }
     }
     log("hashed", found, "matching file(s)");
+
+    // -- ADVANCED: Anti-Forensics & Timestomping Detection ---------------
+    log("\n[threat-hunt] Initiating zero-touch anti-forensics audit...");
+    let info = sysinfo();
+    let hunt_target = "/tmp";
+    if (contains(get(info, "os", ""), "Windows")) {
+        // Attackers often drop payloads in world-writable Windows directories
+        hunt_target = "C:\\Users\\Public";
+    }
+
+    log("scanning high-risk staging directory :", hunt_target);
+    let hunt_files = listdir(hunt_target);
+    let sus_found = 0;
+    let timestomped = 0;
+
+    for (name in hunt_files) {
+        let lower_name = lower(name);
+        
+        // Look for executables and scripts dropped in public/temp dirs
+        if (contains(lower_name, ".exe") or contains(lower_name, ".ps1") or contains(lower_name, ".sh") or contains(lower_name, ".elf") or contains(lower_name, ".bat")) {
+            let full_path = hunt_target + "/" + name;
+            let stats = fstat(full_path);
+            
+            // Ensure we successfully stat'd the file (no permission errors)
+            if (get(stats, "error") == none) {
+                let mtime = get(stats, "mtime", 0);
+                let ctime = get(stats, "ctime", 0);
+                
+                // Timestomping anomaly: File modification time is artificially older than creation time
+                let delta = ctime - mtime;
+                
+                let h = sha256(full_path);
+                log("  ! SUSPICIOUS DROP:", name, "->", h);
+                sus_found = sus_found + 1;
+                
+                // If modification predates creation by more than 24 hours (86400 seconds)
+                if (delta > 86400) {
+                    log("    >>> TIMESTOMP DETECTED: Modification predates creation by", (delta / 86400), "days.");
+                    timestomped = timestomped + 1;
+                }
+            }
+        }
+    }
+    
+    if (sus_found == 0) {
+        log("  > No suspicious payloads or timestomped artifacts found in staging.");
+    } else {
+        log("  > detected", timestomped, "timestomped artifact(s) out of", sus_found, "suspicious drops.");
+    }
+    log("");
+
     log("pulse   :", hexdump("JOCKY-IN-MEMORY-OK"));
     log("=== end ===");
 }

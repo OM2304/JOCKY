@@ -1,10 +1,15 @@
 // netprobe.jck — read-only network connection census.
 // Categorizes sockets by protocol/state without touching them.
+//
+// ADVANCED THREAT HUNTING FEATURES ENABLED:
+// - High-Risk Port Detection (Metasploit, Cobalt Strike, etc.)
+// - Unsafe Exposure Detection (RDP/SMB on 0.0.0.0)
+// - Socket-to-Process Attribution (Finding the daemon behind the port)
 
 func main() {
     log("=== JOCKY NETPROBE ===");
     let conns = netconns();
-    log("total sockets       :", len(conns));
+    log("total sockets        :", len(conns));
     let udp = 0;
     let listening = 0;
     let established = 0;
@@ -23,9 +28,60 @@ func main() {
         }
     }
     other = len(conns) - udp - listening - established;
-    log("LISTENING sockets   :", listening);
+    log("LISTENING sockets  :", listening);
     log("ESTABLISHED sockets :", established);
     log("UDP sockets         :", udp);
     log("other               :", other);
-    log("=== end ===");
+
+    // -- ADVANCED: Active Threat Hunting (High-Risk Ports & C2 Detection) --
+    log("\n[threat-hunt] Scanning for high-risk port bindings and C2 indicators...");
+    let high_risk_found = 0;
+    let p_list = procs(); // Grab process list to correlate PID to binary
+
+    for (c in conns) {
+        let state = str(get(c, "state", ""));
+        let local = str(get(c, "local", ""));
+        let remote = str(get(c, "remote", ""));
+        let pid = get(c, "pid");
+
+        // Match common backdoor / C2 default ports
+        // 4444: Metasploit, 1337: Generic/Leet, 50050: Cobalt Strike
+        let is_c2 = contains(local, ":4444") or contains(local, ":1337") or contains(local, ":50050") or contains(remote, ":4444") or contains(remote, ":1337") or contains(remote, ":50050");
+
+        // Match dangerous services exposed to all interfaces (0.0.0.0 or [::])
+        let exposed_rdp = (contains(local, "0.0.0.0:3389") or contains(local, "[::]:3389")) and contains(state, "LISTEN");
+        let exposed_smb = (contains(local, "0.0.0.0:445") or contains(local, "[::]:445")) and contains(state, "LISTEN");
+
+        if (is_c2 or exposed_rdp or exposed_smb) {
+            high_risk_found = high_risk_found + 1;
+            log("  ! HIGH-RISK SOCKET DETECTED");
+            log("    Binding :", local, "->", remote, "(", state, ")");
+            
+            if (is_c2) {
+                log("    Threat  : Known C2/Backdoor port signature match");
+            }
+            if (exposed_rdp or exposed_smb) {
+                log("    Threat  : Critical service (RDP/SMB) exposed to Any (0.0.0.0)");
+            }
+
+            // Process Attribution
+            if (pid != "" and pid != 0) {
+                for (p in p_list) {
+                    if (get(p, "pid") == pid) {
+                        log("    Daemon  :", get(p, "name"), "(PID:", pid, ")");
+                        log("    Binary  :", get(p, "exe"));
+                    }
+                }
+            } else {
+                log("    Daemon  : [Hidden or Kernel-level socket] (PID:", pid, ")");
+            }
+            log("");
+        }
+    }
+
+    if (high_risk_found == 0) {
+        log("  > No high-risk port bindings or known C2 channels detected.");
+    }
+
+    log("\n=== end ===");
 }
