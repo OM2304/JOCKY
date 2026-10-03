@@ -32,13 +32,13 @@ export async function POST(req: NextRequest) {
       ? process.cwd()
       : path.resolve(process.cwd(), '..');
 
-    // 1. Generate a random 64-character hex string (32 bytes) for JYCRYPT1 encryption
-    const key = crypto.randomBytes(32).toString('hex');
+    // 1. Resolve encryption key: use process.env.JOCKY_KEY with fallback to default master key
+    const key = process.env.JOCKY_KEY || '00112233445566778899aabbccddeeff';
 
     // 2. Generate a unique task tag
     const tag = `task-${Date.now()}`;
 
-    // 3. Command 1: Compile & Encrypt payload
+    // 3. Command 1: Compile & Encrypt payload with explicit key
     const encCmd = `python -m jocky enc examples/${safeScript}.jck -o payload.jxp -k ${key}`;
     const { stdout: encStdout, stderr: encStderr } = await execAsync(encCmd, {
       cwd: frameworkRoot,

@@ -24,6 +24,9 @@ export default function Navbar() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setTimeStr(
@@ -133,8 +136,9 @@ export default function Navbar() {
             <button
               onClick={toggleTheme}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title={`Current theme: ${theme || 'system'}. Click to toggle.`}
+              title={mounted ? `Current theme: ${theme || 'system'}. Click to toggle.` : 'Toggle theme'}
               aria-label="Toggle theme"
+              suppressHydrationWarning
             >
               {mounted ? (
                 resolvedTheme === 'dark' ? (

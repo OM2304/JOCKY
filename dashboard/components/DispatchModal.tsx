@@ -69,7 +69,7 @@ export const FORENSIC_SCRIPTS: ForensicScriptOption[] = [
 const INITIAL_STEPS: StepState[] = [
   {
     title: 'Polymorphic Compilation & Keyed Encryption',
-    desc: 'Generating 32-byte JYCRYPT1 cipher key and compiling byte container',
+    desc: 'Applying Master Cipher Key and compiling byte container',
     status: 'pending',
   },
   {
@@ -274,7 +274,7 @@ export default function DispatchModal({
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Payload will be compiled into polymorphic bytecode and encrypted with a fresh 32-byte key.
+                Payload will be compiled into polymorphic bytecode and encrypted with the synchronized Master Cipher Key.
               </p>
             </div>
 

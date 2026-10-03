@@ -7,10 +7,10 @@ A modern, enterprise-grade Next.js (App Router) dashboard for the **JOCKY** stea
 - **Interactive Task Dispatcher (`POST /api/dispatch` & `DispatchModal.tsx`)**:
   - Live interactive modal to dispatch in-memory forensic triages (`triage`, `netprobe`, `stealth`, `ioc_sweep`, `lateral_recon`, `sandbox_guard`) directly from the dashboard.
   - Automatically executes the 4-stage pipeline:
-    1. Generates 32-byte (64-char hex) JYCRYPT1 cipher key.
+    1. Resolves synchronized Master Cipher Key (`process.env.JOCKY_KEY` or default `00112233445566778899aabbccddeeff`).
     2. Compiles script to polymorphic bytecode and encrypts container (`payload.jxp`).
     3. Queues task on the central controller (`agents.controller`).
-    4. Target node executes in RAM via `agents.client` (with `JOCKY_KEY` in environment) and ingests findings back to the controller.
+    4. Target node executes in RAM via `agents.client` (with synchronized `JOCKY_KEY` in environment) and ingests findings back to the controller.
   - Real-time animated stepper UI with progress spinners and instant `router.refresh()` upon telemetry ingestion.
 
 - **Chain-of-Custody Evidence Export (`components/ExportEvidenceButton.tsx`)**:
