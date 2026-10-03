@@ -101,6 +101,8 @@ export async function getReports(): Promise<ForensicReport[]> {
           sha256_payload: rawJson.sha256_payload || '',
           result: rawJson.result ?? 'None',
           output: rawJson.output || '',
+          parent_hash: rawJson.parent_hash,
+          merkle_root: rawJson.merkle_root,
           parsedSummary: parseOutputSummary(rawJson.output || ''),
         });
       } catch (err) {

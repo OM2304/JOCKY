@@ -48,6 +48,8 @@ export default function ReportsTable({ reports }: ReportsTableProps) {
         report.task.toLowerCase().includes(q) ||
         report.sha256_payload.toLowerCase().includes(q) ||
         report.build_id.toLowerCase().includes(q) ||
+        (report.merkle_root && report.merkle_root.toLowerCase().includes(q)) ||
+        (report.parent_hash && report.parent_hash.toLowerCase().includes(q)) ||
         (report.parsedSummary?.host && report.parsedSummary.host.toLowerCase().includes(q)) ||
         report.output.toLowerCase().includes(q);
 
@@ -231,7 +233,7 @@ export default function ReportsTable({ reports }: ReportsTableProps) {
                         </span>
                       </td>
 
-                      {/* Truncated Hash with Copy */}
+                      {/* Truncated Hash with Copy & Merkle Chain */}
                       <td className="px-3 py-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <span
@@ -255,6 +257,15 @@ export default function ReportsTable({ reports }: ReportsTableProps) {
                             </button>
                           )}
                         </div>
+                        {report.merkle_root && (
+                          <div
+                            className="mt-0.5 flex items-center gap-1 text-[10px] font-mono text-primary/80"
+                            title={`Merkle Root: ${report.merkle_root}`}
+                          >
+                            <span className="text-muted-foreground font-sans text-[9px]">ROOT:</span>
+                            <span className="truncate max-w-[120px]">{report.merkle_root.substring(0, 10)}...</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Action Link */}

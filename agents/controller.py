@@ -39,6 +39,33 @@ from agents.common import now_iso, task_id, sha256_hex  # noqa: E402
 VERSION = "0.1"
 VAR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "var")
 
+# Cryptographic Merkle Chain of Custody (agent_name -> current_merkle_root)
+merkle_chains: dict[str, str] = {}
+
+
+def _seed_merkle_chains():
+    """Seed merkle_chains from existing reports on disk to maintain continuity across restarts."""
+    rep_dir = os.path.join(VAR, "reports")
+    if not os.path.isdir(rep_dir):
+        return
+    try:
+        for fname in sorted(os.listdir(rep_dir)):
+            if fname.endswith(".json"):
+                try:
+                    with open(os.path.join(rep_dir, fname), "r", encoding="utf-8") as f:
+                        doc = json.load(f)
+                        ag = str(doc.get("agent", "")).replace("/", "_")
+                        m_root = doc.get("merkle_root")
+                        if ag and m_root:
+                            merkle_chains[ag] = m_root
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+_seed_merkle_chains()
+
 
 class ControllerState:
     def __init__(self, token: str):
@@ -135,16 +162,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(401, {"error": "unauthorized"})
         p = self.path
         if p == "/api/v1/report":
+            body = self._read_body()
             try:
-                rep = json.loads(self._read_body().decode("utf-8"))
+                rep = json.loads(body.decode("utf-8"))
             except Exception:
                 return self._json(400, {"error": "bad report json"})
             tid = str(rep.get("task", "anon"))
             agent = str(rep.get("agent", "anon")).replace("/", "_")
+
+            # Cryptographic Merkle Chain of Custody
+            # 1. Calculate SHA-256 hash of incoming report data
+            current_payload_hash = hashlib.sha256(body).hexdigest()
+
+            # 2. Look up the agent's previous hash in merkle_chains (default "GENESIS")
+            parent_hash = merkle_chains.get(agent, "GENESIS")
+
+            # 3. Set parent_hash inside the report dictionary
+            rep["parent_hash"] = parent_hash
+
+            # 4. Calculate new merkle_root: hash of concatenated parent_hash + current_payload_hash
+            combined = f"{parent_hash}{current_payload_hash}".encode("utf-8")
+            merkle_root = hashlib.sha256(combined).hexdigest()
+
+            # 5. Add merkle_root to report dictionary, update global dictionary, and save to disk
+            rep["merkle_root"] = merkle_root
+            merkle_chains[agent] = merkle_root
+
             fn = os.path.join(VAR, "reports", f"{tid}_{agent}_{time.time_ns() // 1_000_000}.json")
             with open(fn, "w", encoding="utf-8") as f:
                 f.write(json.dumps(rep, indent=2))
-            return self._json(200, {"stored": os.path.basename(fn)})
+            return self._json(200, {
+                "stored": os.path.basename(fn),
+                "parent_hash": parent_hash,
+                "merkle_root": merkle_root,
+            })
         if p.startswith("/agentdrop/put/"):
             did = p.rsplit("/", 1)[-1]
             st.drops[did] = self._read_body()

@@ -13,6 +13,7 @@ import {
   FileCode,
   ShieldAlert,
   ShieldCheck,
+  GitCommit,
 } from 'lucide-react';
 
 interface MetadataCardProps {
@@ -158,6 +159,79 @@ export default function MetadataCard({ report }: MetadataCardProps) {
         <div className="mt-2 font-mono text-xs text-foreground tracking-wide break-all select-all bg-card p-2.5 rounded-md border border-border">
           {report.sha256_payload || 'No payload hash recorded'}
         </div>
+      </div>
+
+      {/* Cryptographic Merkle Chain of Custody Section */}
+      <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 pb-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+              Cryptographic Chain of Custody (Merkle Verification)
+            </span>
+          </div>
+          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-primary border border-primary/20">
+            {report.parent_hash === 'GENESIS' || !report.parent_hash ? 'GENESIS ROOT' : 'VERIFIED CHAIN'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Parent Hash */}
+          <div className="rounded-md border border-border bg-card p-3 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
+                Parent Hash (Previous Block)
+              </span>
+              {report.parent_hash && (
+                <button
+                  onClick={() => handleCopy('parent_hash', report.parent_hash!)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {copiedKey === 'parent_hash' ? (
+                    <Check className="h-3 w-3 text-primary" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  <span>{copiedKey === 'parent_hash' ? 'Copied' : 'Copy'}</span>
+                </button>
+              )}
+            </div>
+            <div className="font-mono text-xs font-semibold text-foreground tracking-wide break-all select-all pt-0.5">
+              {report.parent_hash || 'GENESIS (Initial Ingestion Node)'}
+            </div>
+          </div>
+
+          {/* Merkle Root */}
+          <div className="rounded-md border border-border bg-card p-3 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                <Hash className="h-3.5 w-3.5 text-primary" />
+                Current Merkle Root
+              </span>
+              {report.merkle_root && (
+                <button
+                  onClick={() => handleCopy('merkle_root', report.merkle_root!)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {copiedKey === 'merkle_root' ? (
+                    <Check className="h-3 w-3 text-primary" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  <span>{copiedKey === 'merkle_root' ? 'Copied' : 'Copy'}</span>
+                </button>
+              )}
+            </div>
+            <div className="font-mono text-xs font-semibold text-primary tracking-wide break-all select-all pt-0.5">
+              {report.merkle_root || 'Awaiting Controller Ingestion Hash'}
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground font-mono leading-relaxed pt-0.5">
+          SHA256(Parent Hash + Payload Hash) = Merkle Root • Tamper-evident ledger guarantees chronological non-repudiation for incident response and courtroom admissibility.
+        </p>
       </div>
     </div>
   );

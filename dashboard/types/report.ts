@@ -6,6 +6,8 @@ export interface RawReportData {
   sha256_payload: string;
   result: string;
   output: string;
+  parent_hash?: string;
+  merkle_root?: string;
   [key: string]: unknown;
 }
 

@@ -36,6 +36,8 @@ export default function ExportEvidenceButton({ report }: ExportEvidenceButtonPro
           sha256_payload: report.sha256_payload,
           result: report.result,
           output: report.output,
+          parent_hash: report.parent_hash,
+          merkle_root: report.merkle_root,
           parsed_summary: report.parsedSummary,
         },
       };
